@@ -19,11 +19,22 @@ type Response = {
   }
 }
 
+const norm = (a: number[]): number =>
+  a.reduce((prev, curr) => curr ** 2 + prev) ** (1 / 2)
+
+const cosin = (a: number[], b: number[]): number | undefined => {
+  if (a.length != b.length) return
+  const innerProduct = a
+    .map((r, i) => r * b[i])
+    .reduce((prev, curr) => prev + curr, 0)
+  return innerProduct / (norm(a) * norm(b))
+}
+
 const IndexPage: NextPage = () => {
   const [apiKey, setApiKey] = useState<string>()
-  const [body, setBody] = useState<string>()
+  const [bodies, setBodies] = useState<string[]>(["", ""])
   const [message, setMessage] = useState<string>()
-  const [response, setResponse] = useState<Response>()
+  const [responses, setResponses] = useState<Response[]>()
   useEffect(() => {
     const storageApiKey = localStorage.getItem(LOCAL_STORAGE_KEY_API_KEY)
     if (storageApiKey) setApiKey(storageApiKey)
@@ -32,24 +43,31 @@ const IndexPage: NextPage = () => {
     event.preventDefault()
     if (!apiKey) return
     setMessage("Requesting...")
-    setResponse(undefined)
+    setResponses(undefined)
     localStorage.setItem(LOCAL_STORAGE_KEY_API_KEY, apiKey)
     try {
-      const { data } = await axios.post<Response>(
-        "https://api.openai.com/v1/embeddings",
-        {
-          model: "text-embedding-ada-002",
-          input: body,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-          },
-        }
+      const responses = await Promise.all(
+        bodies
+          .filter((body) => body.length > 0)
+          .map((body) =>
+            axios.post<Response>(
+              "https://api.openai.com/v1/embeddings",
+              {
+                model: "text-embedding-ada-002",
+                input: body,
+              },
+              {
+                headers: {
+                  Authorization: `Bearer ${apiKey}`,
+                },
+              }
+            )
+          )
       )
-      if (data.data.length > 0) {
+      const dataList = responses.map((response) => response.data)
+      if (dataList.every((data) => data.data.length > 0)) {
         setMessage("Complete!")
-        setResponse(data)
+        setResponses(dataList)
       } else {
         throw "Failed..."
       }
@@ -94,18 +112,25 @@ const IndexPage: NextPage = () => {
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
           />
-          <textarea
-            rows={4}
-            placeholder="Text"
-            style={{
-              fontSize: "1.5rem",
-              padding: ".5rem 1rem",
-              width: "100%",
-              marginBottom: "10px",
-            }}
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-          />
+          {bodies.map((body, index) => (
+            <textarea
+              key={index}
+              rows={4}
+              placeholder={`Text${index + 1}`}
+              style={{
+                fontSize: "1.5rem",
+                padding: ".5rem 1rem",
+                width: "100%",
+                marginBottom: "10px",
+              }}
+              value={body}
+              onChange={(e) => {
+                const newBodies = [...bodies]
+                newBodies[index] = e.target.value
+                setBodies(newBodies)
+              }}
+            />
+          ))}
           <button
             style={{
               padding: "1rem 2rem",
@@ -116,7 +141,7 @@ const IndexPage: NextPage = () => {
               fontSize: "1.5rem",
               cursor: "pointer",
             }}
-            disabled={!body || !apiKey}
+            disabled={!bodies.some((b) => b.length > 0) || !apiKey}
           >
             Submit
           </button>
@@ -137,23 +162,43 @@ const IndexPage: NextPage = () => {
               {message}
             </p>
           )}
-          {response && response.data.length > 0 && (
-            <>
-              <p>Total token:{response.usage.total_tokens}</p>
-              {response.data.map((data) => (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              margin: "auto",
+            }}
+          >
+            <div>
+              {responses &&
+                responses.length == 2 &&
+                cosin(
+                  responses[0].data[0].embedding,
+                  responses[1].data[0].embedding
+                )}
+            </div>
+            {responses &&
+              responses.map((response) => (
                 <>
-                  <table>
-                    {data.embedding.map((score, index) => (
-                      <tr key={index}>
-                        <th>#{index + 1}</th>
-                        <td>{score}</td>
-                      </tr>
-                    ))}
-                  </table>
+                  {response.data.map((data) => (
+                    <>
+                      <table>
+                        <tr>
+                          <td>Total token</td>
+                          <td>{response.usage.total_tokens}</td>
+                        </tr>
+                        {data.embedding.map((score, index) => (
+                          <tr key={index}>
+                            <th>#{index + 1}</th>
+                            <td>{score}</td>
+                          </tr>
+                        ))}
+                      </table>
+                    </>
+                  ))}
                 </>
               ))}
-            </>
-          )}
+          </div>
         </div>
       </section>
       <footer
