@@ -13,7 +13,7 @@ const App = ({ Component, pageProps }: AppProps): ReactElement => {
             name="viewport"
             content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
           />
-          <title>めうめう語生成機</title>
+          <title>Ada text embedding sample</title>
         </Head>
         <Component {...pageProps} />
       </>

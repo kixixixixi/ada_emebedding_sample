@@ -5,16 +5,16 @@ import axios from "axios"
 
 const LOCAL_STORAGE_KEY_API_KEY = "OPENAI_API_KEY" as const
 
-type ImageGenerationResponse = {
-  object: "edit"
-  created: number
-  choices: {
-    text: string
+type Response = {
+  object: "list"
+  model: "text-embedding-ada-002"
+  data: {
+    object: "embedding"
+    embedding: number[]
     index: number
   }[]
   usage: {
     prompt_tokens: number
-    completion_tokens: number
     total_tokens: number
   }
 }
@@ -23,7 +23,7 @@ const IndexPage: NextPage = () => {
   const [apiKey, setApiKey] = useState<string>()
   const [body, setBody] = useState<string>()
   const [message, setMessage] = useState<string>()
-  const [response, setResponse] = useState<ImageGenerationResponse>()
+  const [response, setResponse] = useState<Response>()
   useEffect(() => {
     const storageApiKey = localStorage.getItem(LOCAL_STORAGE_KEY_API_KEY)
     if (storageApiKey) setApiKey(storageApiKey)
@@ -31,17 +31,15 @@ const IndexPage: NextPage = () => {
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!apiKey) return
-    setMessage("変換中めう...")
+    setMessage("Requesting...")
     setResponse(undefined)
     localStorage.setItem(LOCAL_STORAGE_KEY_API_KEY, apiKey)
     try {
-      const { data } = await axios.post<ImageGenerationResponse>(
-        "https://api.openai.com/v1/edits",
+      const { data } = await axios.post<Response>(
+        "https://api.openai.com/v1/embeddings",
         {
-          model: "text-davinci-edit-001",
+          model: "text-embedding-ada-002",
           input: body,
-          instruction:
-            "一人称が省略されていれば追加。敬語を除く。すべての文の語尾を連体形に変更し最後に「めう」とつける。わたしや俺などの一人称を「めう」に変更。",
         },
         {
           headers: {
@@ -49,14 +47,14 @@ const IndexPage: NextPage = () => {
           },
         }
       )
-      if (data.choices.length > 0) {
-        setMessage("変換成功めう！")
+      if (data.data.length > 0) {
+        setMessage("Complete!")
         setResponse(data)
       } else {
-        throw "生成失敗めう..."
+        throw "Failed..."
       }
     } catch (e) {
-      setMessage(`エラーめう... (${e})`)
+      setMessage(`Error... (${e})`)
     }
   }
   return (
@@ -68,11 +66,11 @@ const IndexPage: NextPage = () => {
           style={{
             textAlign: "center",
             marginBottom: "2rem",
-            borderBottom: "2px solid pink",
+            borderBottom: "2px solid gray",
             fontSize: "2rem",
           }}
         >
-          めう語生成機(α)
+          Text embedding by ada
         </h1>
         <form
           style={{
@@ -85,7 +83,7 @@ const IndexPage: NextPage = () => {
           onSubmit={submit}
         >
           <input
-            placeholder="OPENAIのAPI Keyをいれるめう!"
+            placeholder="OPENAI API key"
             type="password"
             style={{
               fontSize: "1.5rem",
@@ -98,7 +96,7 @@ const IndexPage: NextPage = () => {
           />
           <textarea
             rows={4}
-            placeholder="変換したい文章を入力するめう!"
+            placeholder="Text"
             style={{
               fontSize: "1.5rem",
               padding: ".5rem 1rem",
@@ -111,7 +109,7 @@ const IndexPage: NextPage = () => {
           <button
             style={{
               padding: "1rem 2rem",
-              backgroundColor: "pink",
+              backgroundColor: "gray",
               color: "white",
               borderRadius: "5px",
               border: "none",
@@ -120,7 +118,7 @@ const IndexPage: NextPage = () => {
             }}
             disabled={!body || !apiKey}
           >
-            変換するめう！
+            Submit
           </button>
         </form>
         <div
@@ -139,15 +137,17 @@ const IndexPage: NextPage = () => {
               {message}
             </p>
           )}
-          {response && response.choices.length > 0 && (
+          {response && response.data.length > 0 && (
             <>
-              {response.choices.map((choice) => (
-                <p
-                  key={choice.index}
-                  style={{ fontSize: "2rem", borderBottom: "solid pink 2px" }}
-                >
-                  {choice.text}
-                </p>
+              {response.data.map((data) => (
+                <table>
+                  {data.embedding.map((score, index) => (
+                    <tr key={index}>
+                      <th>#{index + 1}</th>
+                      <td>{score}</td>
+                    </tr>
+                  ))}
+                </table>
               ))}
             </>
           )}
@@ -155,7 +155,7 @@ const IndexPage: NextPage = () => {
       </section>
       <footer
         style={{
-          background: "pink",
+          background: "gray",
           marginTop: "4rem",
           padding: "4rem",
           textAlign: "center",
@@ -165,7 +165,7 @@ const IndexPage: NextPage = () => {
         @kixixixixi
         <p>
           <a
-            href="//github.com/kixixixixi/txt2meu"
+            href="//github.com/kixixixixi/ada_emebedding_sample"
             style={{ color: "white", textDecoration: "none" }}
           >
             View on Github
