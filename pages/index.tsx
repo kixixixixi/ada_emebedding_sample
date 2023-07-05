@@ -139,15 +139,18 @@ const IndexPage: NextPage = () => {
           )}
           {response && response.data.length > 0 && (
             <>
+              <p>Total token:{response.usage.total_tokens}</p>
               {response.data.map((data) => (
-                <table>
-                  {data.embedding.map((score, index) => (
-                    <tr key={index}>
-                      <th>#{index + 1}</th>
-                      <td>{score}</td>
-                    </tr>
-                  ))}
-                </table>
+                <>
+                  <table>
+                    {data.embedding.map((score, index) => (
+                      <tr key={index}>
+                        <th>#{index + 1}</th>
+                        <td>{score}</td>
+                      </tr>
+                    ))}
+                  </table>
+                </>
               ))}
             </>
           )}
