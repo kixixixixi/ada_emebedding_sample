@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import type { FormEvent } from "react"
 import { NextPage } from "next"
 import axios from "axios"
+import type { AxiosResponse } from "axios"
 
 const LOCAL_STORAGE_KEY_API_KEY = "OPENAI_API_KEY" as const
 
@@ -32,13 +33,31 @@ const cosin = (a: number[], b: number[]): number | undefined => {
 
 const IndexPage: NextPage = () => {
   const [apiKey, setApiKey] = useState<string>()
-  const [bodies, setBodies] = useState<string[]>(["", ""])
+  const [base, setBase] = useState<string>("")
+  const [bodies, setBodies] = useState<string[]>(["", "", "", ""])
   const [message, setMessage] = useState<string>()
   const [responses, setResponses] = useState<Response[]>()
   useEffect(() => {
     const storageApiKey = localStorage.getItem(LOCAL_STORAGE_KEY_API_KEY)
     if (storageApiKey) setApiKey(storageApiKey)
   }, [])
+
+  const request = async (
+    body: string
+  ): Promise<AxiosResponse<Response, any>> => {
+    return await axios.post<Response>(
+      "https://api.openai.com/v1/embeddings",
+      {
+        model: "text-embedding-ada-002",
+        input: body,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
+      }
+    )
+  }
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!apiKey) return
@@ -46,24 +65,12 @@ const IndexPage: NextPage = () => {
     setResponses(undefined)
     localStorage.setItem(LOCAL_STORAGE_KEY_API_KEY, apiKey)
     try {
-      const responses = await Promise.all(
-        bodies
+      const responses = await Promise.all([
+        request(base),
+        ...bodies
           .filter((body) => body.length > 0)
-          .map((body) =>
-            axios.post<Response>(
-              "https://api.openai.com/v1/embeddings",
-              {
-                model: "text-embedding-ada-002",
-                input: body,
-              },
-              {
-                headers: {
-                  Authorization: `Bearer ${apiKey}`,
-                },
-              }
-            )
-          )
-      )
+          .map((body) => request(body)),
+      ])
       const dataList = responses.map((response) => response.data)
       if (dataList.every((data) => data.data.length > 0)) {
         setMessage("Complete!")
@@ -78,7 +85,7 @@ const IndexPage: NextPage = () => {
   return (
     <>
       <section
-        style={{ padding: "4rem 2rem", maxWidth: "720px", margin: "auto" }}
+        style={{ padding: "4rem 2rem", maxWidth: "80rem", margin: "auto" }}
       >
         <h1
           style={{
@@ -112,6 +119,18 @@ const IndexPage: NextPage = () => {
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
           />
+          <textarea
+            rows={4}
+            placeholder="Base text"
+            style={{
+              fontSize: "1.5rem",
+              padding: ".5rem 1rem",
+              width: "100%",
+              marginBottom: "10px",
+            }}
+            value={base}
+            onChange={(e) => setBase(e.target.value)}
+          />
           {bodies.map((body, index) => (
             <textarea
               key={index}
@@ -141,7 +160,9 @@ const IndexPage: NextPage = () => {
               fontSize: "1.5rem",
               cursor: "pointer",
             }}
-            disabled={!bodies.some((b) => b.length > 0) || !apiKey}
+            disabled={
+              base.length == 0 || !bodies.some((b) => b.length > 0) || !apiKey
+            }
           >
             Submit
           </button>
@@ -165,39 +186,79 @@ const IndexPage: NextPage = () => {
           <div
             style={{
               display: "flex",
-              flexDirection: "row",
+              flexDirection: "column",
               margin: "auto",
             }}
           >
-            <div>
-              {responses &&
-                responses.length == 2 &&
-                cosin(
-                  responses[0].data[0].embedding,
-                  responses[1].data[0].embedding
-                )}
-            </div>
-            {responses &&
-              responses.map((response) => (
-                <>
-                  {response.data.map((data) => (
-                    <>
-                      <table>
-                        <tr>
-                          <td>Total token</td>
-                          <td>{response.usage.total_tokens}</td>
-                        </tr>
-                        {data.embedding.map((score, index) => (
-                          <tr key={index}>
-                            <th>#{index + 1}</th>
-                            <td>{score}</td>
-                          </tr>
-                        ))}
-                      </table>
-                    </>
+            {responses && responses.length > 1 && (
+              <>
+                <table>
+                  <tr>
+                    <th>#</th>
+                    <th>Base</th>
+                    {responses.slice(1).map((_, index) => (
+                      <th>Text{index + 1}</th>
+                    ))}
+                  </tr>
+                  <tr>
+                    <th>Total token</th>
+                    <td
+                      style={{
+                        textAlign: "right",
+                      }}
+                    >
+                      {responses[0].usage.total_tokens}
+                    </td>
+                    {responses.slice(1).map((response) => (
+                      <td
+                        style={{
+                          textAlign: "right",
+                        }}
+                      >
+                        {response.usage.total_tokens}
+                      </td>
+                    ))}
+                  </tr>
+                  <tr>
+                    <th>Consin</th>
+                    <td>-</td>
+                    {responses.slice(1).map((response, index) => (
+                      <td
+                        style={{
+                          textAlign: "right",
+                        }}
+                      >
+                        {cosin(
+                          responses[0].data[0].embedding,
+                          response.data[0].embedding
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                  {responses[0].data[0].embedding.map((score, index) => (
+                    <tr key={index}>
+                      <th>#{index + 1}</th>
+                      <td
+                        style={{
+                          textAlign: "right",
+                        }}
+                      >
+                        {score}
+                      </td>
+                      {responses.slice(1).map((response) => (
+                        <td
+                          style={{
+                            textAlign: "right",
+                          }}
+                        >
+                          {response.data[0].embedding[index]}
+                        </td>
+                      ))}
+                    </tr>
                   ))}
-                </>
-              ))}
+                </table>
+              </>
+            )}
           </div>
         </div>
       </section>
