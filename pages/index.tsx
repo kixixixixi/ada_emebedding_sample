@@ -220,7 +220,7 @@ const IndexPage: NextPage = () => {
                     ))}
                   </tr>
                   <tr>
-                    <th>Consin</th>
+                    <th>Cosin</th>
                     <td>-</td>
                     {responses.slice(1).map((response, index) => (
                       <td
