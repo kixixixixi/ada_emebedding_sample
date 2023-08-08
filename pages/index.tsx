@@ -63,7 +63,7 @@ const IndexPage: NextPage = () => {
     event.preventDefault()
     if (!apiKey) return
     setMessage("Requesting...")
-    setResponses(undefined)
+    setBaseResponse(undefined)
     localStorage.setItem(LOCAL_STORAGE_KEY_API_KEY, apiKey)
     try {
       const response = (await request(base)).data
@@ -238,7 +238,7 @@ const IndexPage: NextPage = () => {
               margin: "auto",
             }}
           >
-            {responses && responses.length > 1 && (
+            {responses && (
               <>
                 <table>
                   <tr>
