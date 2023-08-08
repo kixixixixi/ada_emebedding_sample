@@ -23,7 +23,7 @@ type Response = {
 const norm = (a: number[]): number =>
   a.reduce((prev, curr) => curr ** 2 + prev) ** (1 / 2)
 
-const cosin = (a: number[], b: number[]): number | undefined => {
+const cosine = (a: number[], b: number[]): number | undefined => {
   if (a.length != b.length) return
   const innerProduct = a
     .map((r, i) => r * b[i])
@@ -34,9 +34,10 @@ const cosin = (a: number[], b: number[]): number | undefined => {
 const IndexPage: NextPage = () => {
   const [apiKey, setApiKey] = useState<string>()
   const [base, setBase] = useState<string>("")
-  const [bodies, setBodies] = useState<string[]>(["", "", "", ""])
+  const [bodies, setBodies] = useState<string[]>([""])
   const [message, setMessage] = useState<string>()
   const [responses, setResponses] = useState<Response[]>()
+  const [baseResponse, setBaseResponse] = useState<Response>()
   useEffect(() => {
     const storageApiKey = localStorage.getItem(LOCAL_STORAGE_KEY_API_KEY)
     if (storageApiKey) setApiKey(storageApiKey)
@@ -58,7 +59,25 @@ const IndexPage: NextPage = () => {
       }
     )
   }
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
+  const fetchBase = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!apiKey) return
+    setMessage("Requesting...")
+    setResponses(undefined)
+    localStorage.setItem(LOCAL_STORAGE_KEY_API_KEY, apiKey)
+    try {
+      const response = (await request(base)).data
+      if (response.data.length > 0) {
+        setMessage("Complete!")
+        setBaseResponse(response)
+      } else {
+        throw "Failed..."
+      }
+    } catch (e) {
+      setMessage(`Error... (${e})`)
+    }
+  }
+  const fetchTarget = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!apiKey) return
     setMessage("Requesting...")
@@ -66,7 +85,6 @@ const IndexPage: NextPage = () => {
     localStorage.setItem(LOCAL_STORAGE_KEY_API_KEY, apiKey)
     try {
       const responses = await Promise.all([
-        request(base),
         ...bodies
           .filter((body) => body.length > 0)
           .map((body) => request(body)),
@@ -105,13 +123,13 @@ const IndexPage: NextPage = () => {
             margin: "auto",
             padding: "2rem 0",
           }}
-          onSubmit={submit}
+          onSubmit={fetchBase}
         >
           <input
             placeholder="OPENAI API key"
             type="password"
             style={{
-              fontSize: "1.5rem",
+              fontSize: "1rem",
               padding: ".5rem 1rem",
               width: "100%",
               marginBottom: "10px",
@@ -119,11 +137,10 @@ const IndexPage: NextPage = () => {
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
           />
-          <textarea
-            rows={4}
+          <input
             placeholder="Base text"
             style={{
-              fontSize: "1.5rem",
+              fontSize: "1rem",
               padding: ".5rem 1rem",
               width: "100%",
               marginBottom: "10px",
@@ -131,40 +148,71 @@ const IndexPage: NextPage = () => {
             value={base}
             onChange={(e) => setBase(e.target.value)}
           />
-          {bodies.map((body, index) => (
-            <textarea
-              key={index}
-              rows={4}
-              placeholder={`Text${index + 1}`}
-              style={{
-                fontSize: "1.5rem",
-                padding: ".5rem 1rem",
-                width: "100%",
-                marginBottom: "10px",
-              }}
-              value={body}
-              onChange={(e) => {
-                const newBodies = [...bodies]
-                newBodies[index] = e.target.value
-                setBodies(newBodies)
-              }}
-            />
-          ))}
           <button
             style={{
-              padding: "1rem 2rem",
+              padding: ".5rem 2rem",
               backgroundColor: "gray",
               color: "white",
               borderRadius: "5px",
               border: "none",
-              fontSize: "1.5rem",
+              fontSize: "1rem",
               cursor: "pointer",
             }}
-            disabled={
-              base.length == 0 || !bodies.some((b) => b.length > 0) || !apiKey
-            }
+            disabled={base.length == 0 || !apiKey}
           >
-            Submit
+            Fetch base embedding
+          </button>
+        </form>
+        <form
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            margin: "auto",
+            padding: "2rem 0",
+          }}
+          onSubmit={fetchTarget}
+        >
+          <textarea
+            style={{
+              fontSize: "1rem",
+              padding: ".25rem 1rem",
+              width: "100%",
+              marginBottom: "10px",
+            }}
+            placeholder="Target text list"
+            onChange={(e) => {
+              const newBodies = e.target.value.split("\n")
+              setBodies(newBodies)
+            }}
+          />
+          {bodies.map((body, index) => (
+            <div
+              key={index}
+              style={{
+                borderBottom: "solid 1px #333",
+                fontSize: "1rem",
+                padding: ".05rem 1rem",
+                width: "100%",
+              }}
+            >
+              {body}
+            </div>
+          ))}
+          <br />
+          <button
+            style={{
+              padding: ".5rem 2rem",
+              backgroundColor: "gray",
+              color: "white",
+              borderRadius: "5px",
+              border: "none",
+              fontSize: "1rem",
+              cursor: "pointer",
+            }}
+            disabled={!bodies.some((b) => b.length > 0) || !apiKey}
+          >
+            Fetch target embedding
           </button>
         </form>
         <div
@@ -196,7 +244,7 @@ const IndexPage: NextPage = () => {
                   <tr>
                     <th>#</th>
                     <th>Base</th>
-                    {responses.slice(1).map((_, index) => (
+                    {responses.map((_, index) => (
                       <th>Text{index + 1}</th>
                     ))}
                   </tr>
@@ -207,9 +255,9 @@ const IndexPage: NextPage = () => {
                         textAlign: "right",
                       }}
                     >
-                      {responses[0].usage.total_tokens}
+                      {baseResponse?.usage.total_tokens}
                     </td>
-                    {responses.slice(1).map((response) => (
+                    {responses.map((response) => (
                       <td
                         style={{
                           textAlign: "right",
@@ -220,18 +268,19 @@ const IndexPage: NextPage = () => {
                     ))}
                   </tr>
                   <tr>
-                    <th>Cosin</th>
+                    <th>Cosine</th>
                     <td>-</td>
-                    {responses.slice(1).map((response, index) => (
+                    {responses.map((response) => (
                       <td
                         style={{
                           textAlign: "right",
                         }}
                       >
-                        {cosin(
-                          responses[0].data[0].embedding,
-                          response.data[0].embedding
-                        )}
+                        {baseResponse &&
+                          cosine(
+                            baseResponse.data[0].embedding,
+                            response.data[0].embedding
+                          )}
                       </td>
                     ))}
                   </tr>
@@ -244,6 +293,13 @@ const IndexPage: NextPage = () => {
                         }}
                       >
                         {score}
+                      </td>
+                      <td
+                        style={{
+                          textAlign: "right",
+                        }}
+                      >
+                        {baseResponse?.data[0].embedding[index]}
                       </td>
                       {responses.slice(1).map((response) => (
                         <td
