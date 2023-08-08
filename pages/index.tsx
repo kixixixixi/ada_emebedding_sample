@@ -196,6 +196,16 @@ const IndexPage: NextPage = () => {
                 width: "100%",
               }}
             >
+              <b>#{index + 1}</b>:
+              {baseResponse &&
+                responses &&
+                responses[index] &&
+                `(${String(
+                  (cosine(
+                    baseResponse.data[0].embedding,
+                    responses[index].data[0].embedding
+                  ) ?? 0) * 100
+                ).slice(0, 5)}%)`}
               {body}
             </div>
           ))}
