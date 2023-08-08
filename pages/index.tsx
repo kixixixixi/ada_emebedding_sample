@@ -196,16 +196,29 @@ const IndexPage: NextPage = () => {
                 width: "100%",
               }}
             >
-              <b>#{index + 1}</b>:
-              {baseResponse &&
-                responses &&
-                responses[index] &&
-                `(${String(
-                  (cosine(
-                    baseResponse.data[0].embedding,
-                    responses[index].data[0].embedding
-                  ) ?? 0) * 100
-                ).slice(0, 5)}%)`}
+              <b>#{index + 1}</b>&nbsp;
+              {baseResponse && responses && responses[index] && (
+                <span
+                  style={{
+                    background:
+                      (cosine(
+                        baseResponse.data[0].embedding,
+                        responses[index].data[0].embedding
+                      ) ?? 0) > 0.83
+                        ? "#f0f000"
+                        : "#fff",
+                  }}
+                >
+                  {String(
+                    (cosine(
+                      baseResponse.data[0].embedding,
+                      responses[index].data[0].embedding
+                    ) ?? 0) * 100
+                  ).slice(0, 5)}
+                  %
+                </span>
+              )}
+              <br />
               {body}
             </div>
           ))}
